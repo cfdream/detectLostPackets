@@ -38,4 +38,6 @@
 *.Plo
 *.Po
 *.at
-*.in
+*.in 
+*.pcap
+tags
