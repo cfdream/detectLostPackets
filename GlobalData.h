@@ -1,6 +1,7 @@
 #ifndef GLOBAL_DATA_H
 #define GLOBAL_DATA_H
 
+#include <stdint.h>
 #include <stdio.h>
 #include <set>
 #include <queue>
@@ -39,24 +40,30 @@ public:
 class Flow{
 public:    
     uint32 srcip;
+    float lossRate;
+    uint64_t AllVolume;
+    /*
     uint32 dstip;
     uint16 srcport;
     uint16 dstport;
-    double lossRate;
+    */
 
+    /*
     Flow(){}
-
     Flow(uint32 srcip, uint32 dstip, uint16 srcport, uint16 dstport) {
         this->srcip = srcip;
         this->dstip = dstip;
         this->srcport = srcport;
         this->dstport = dstport;
     }
+    */
     Flow(Packet &pkt) {
         this->srcip = pkt.srcip;
+        /*
         this->dstip = pkt.dstip;
         this->srcport = pkt.srcport;
         this->dstport = pkt.dstport;
+        */
     }
 /*
     bool operator<(const Flow &flow) const {

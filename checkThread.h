@@ -35,6 +35,7 @@ void* checkAndSend(void* param) {
                 printf("lostPktNum:%d, seqid:%d srcip:%u - lost rate:%f\n", ++lostPktNum, pkt.seqid, pkt.srcip, flowManager.getLossRate(pkt));
                 Flow flow(pkt);
                 flow.lossRate = flowManager.getLossRate(pkt);
+                flow.AllVolume = flowManager.getAllVolume(pkt);
                 //TODO:send the infor to the network
                 udpSender.sendMessage((char*)(&flow), sizeof(flow));
                 break;
