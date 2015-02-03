@@ -142,7 +142,7 @@ public:
     }
     bool frontAndPop(T &val) {
         /*DEBUG*/
-        usleep(100);
+        //usleep(100);
         /*DEBUG*/
         pthread_mutex_lock(&mtx);
         bool succ = false;

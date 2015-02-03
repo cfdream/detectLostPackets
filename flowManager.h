@@ -28,7 +28,6 @@ struct classcomp {
                 return flow1.srcport < flow2.srcport;
             }
             return flow1.dstip < flow2.dstip;
-            return 0;
         }
         */
         return flow1.srcip < flow2.srcip;
