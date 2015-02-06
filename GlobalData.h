@@ -10,47 +10,45 @@
 
 using namespace std;
 
-typedef unsigned long long uint64;
-typedef unsigned int uint32;
-typedef unsigned short uint16;
-
-const uint32 MAX_PACKETS_IN_BUFFER = 100000;
+const uint32_t MAX_PACKETS_IN_BUFFER = 100000;
 
 class Packet{
 public:    
-    uint32 srcip;
-    uint32 dstip;
-    uint16 srcport;
-    uint16 dstport;
-    uint32 seqid;
-    uint32 len;
+    uint32_t srcip;
+    uint32_t dstip;
+    uint16_t srcport;
+    uint16_t dstport;
+    uint32_t seqid;
+    uint32_t len;
+    uint64_t timestamp;
 
     Packet(){}
 
-    Packet(uint32 srcip, uint32 dstip, uint16 srcport, uint16 dstport, uint32 seqid, uint32 len) {
+    Packet(uint32_t srcip, uint32_t dstip, uint16_t srcport, uint16_t dstport, uint32_t seqid, uint32_t len, uint64_t timestamp) {
         this->srcip = srcip;
         this->dstip = dstip;
         this->srcport = srcport;
         this->dstport = dstport;
         this->seqid = seqid;
         this->len = len;
+        this->timestamp = timestamp;
     }
 };
 
 class Flow{
 public:    
-    uint32 srcip;
+    uint32_t srcip;
     float lossRate;
     uint64_t AllVolume;
     /*
-    uint32 dstip;
-    uint16 srcport;
-    uint16 dstport;
+    uint32_t dstip;
+    uint16_t srcport;
+    uint16_t dstport;
     */
 
     /*
     Flow(){}
-    Flow(uint32 srcip, uint32 dstip, uint16 srcport, uint16 dstport) {
+    Flow(uint32_t srcip, uint32_t dstip, uint16_t srcport, uint16_t dstport) {
         this->srcip = srcip;
         this->dstip = dstip;
         this->srcport = srcport;
@@ -84,7 +82,7 @@ public:
 //thread safe set
 class SafeSet{
     pthread_mutex_t mtx;
-    set<uint64> dataSet;
+    set<uint64_t> dataSet;
     
 public:
     SafeSet() {
@@ -92,7 +90,7 @@ public:
         pthread_mutex_init(&mtx, NULL);
         dataSet.clear();
     }
-    bool findAndErase (const uint64& val) {
+    bool findAndErase (const uint64_t &val) {
         pthread_mutex_lock(&mtx);
         bool exist = false;
         if(dataSet.find(val) != dataSet.end()) {
@@ -103,7 +101,7 @@ public:
         return exist;
     }
 
-    void insert (const uint64& val) {
+    void insert (const uint64_t &val) {
         while(true) {
             pthread_mutex_lock(&mtx);
             if (dataSet.size() < MAX_PACKETS_IN_BUFFER) {
@@ -156,27 +154,46 @@ public:
     }
 };
 
-SafeSet receivedPacketSet;
+/*Start GlobalData Definition*/
+/*Start GlobalData Definition*/
+SafeSet g_receivedPacketSet;
 
-SafeQueue<Packet> groundTruthPacketQueue;
+SafeQueue<Packet> g_groundTruthPacketQueue;
 
-uint32 maxSeqidReceived = 0L;
+uint32_t g_maxSeqidReceived = 0L;
 
-pthread_mutex_t seqidMtx = PTHREAD_MUTEX_INITIALIZER;;
-//pthread_mutex_init(&seqidMtx, NULL);
-uint64 getMaxSeqidReceived() {
-    pthread_mutex_lock(&seqidMtx);
-    uint64 val = maxSeqidReceived;
-    pthread_mutex_unlock(&seqidMtx);
+pthread_mutex_t g_seqidMtx = PTHREAD_MUTEX_INITIALIZER;;
+
+uint32_t g_ith_interval = 0;
+bool g_first_pkt = true;
+
+//interval information
+//about time interval
+const uint64_t FIRST_INTERVAL_START_USECOND = 21600000000ULL;
+const uint64_t SECOND_2_USECOND = 1000000;
+const int INTERVAL_SECONDS = 30;
+const uint64_t USECONDS_IN_ONE_INTERVAL = 30000000;  //SECOND_2_USECOND * INTERVAL_SECONDS;
+
+/*End GlobalData Definition*/
+/*End GlobalData Definition*/
+
+//pthread_mutex_init(&g_seqidMtx, NULL);
+uint64_t getMaxSeqidReceived() {
+    pthread_mutex_lock(&g_seqidMtx);
+    uint64_t val = g_maxSeqidReceived;
+    pthread_mutex_unlock(&g_seqidMtx);
     return val;
 }
 
-void setMaxSeqidReceived(uint32 val) {
-    pthread_mutex_lock(&seqidMtx);
-    if (val > maxSeqidReceived) {
-        maxSeqidReceived = val;
+void setMaxSeqidReceived(uint32_t val) {
+    pthread_mutex_lock(&g_seqidMtx);
+    if (val > g_maxSeqidReceived) {
+        g_maxSeqidReceived = val;
     }
-    pthread_mutex_unlock(&seqidMtx);
+    pthread_mutex_unlock(&g_seqidMtx);
 }
 
+int get_interval_id(uint64_t timestamp) {
+    return (timestamp - FIRST_INTERVAL_START_USECOND) / USECONDS_IN_ONE_INTERVAL + 1;
+}
 #endif

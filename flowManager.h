@@ -1,12 +1,13 @@
 #ifndef FLOW_MANAGER_H
 #define FLOW_MANAGER_H
 
+#include <stdint.h>
 #include <map>
 #include "GlobalData.h"
 
 struct FlowValue {
-    uint64 allBytes;
-    uint64 lostBytes;
+    uint64_t allBytes;
+    uint64_t lostBytes;
 };
 
 struct classcomp {
@@ -34,55 +35,67 @@ struct classcomp {
     }
 };
 
+
+//TODO: dual buffer here
 class FlowManager{
 public:
-    map<Flow, uint64, classcomp> flowAllMap;
-    map<Flow, uint64, classcomp> flowLostMap;
+    map<Flow, uint64_t, classcomp> flowAllMap[2];
+    map<Flow, uint64_t, classcomp> flowLostMap[2];
+    int idx;
 
-    void addAllBytes(Packet& pkt, uint32 len) {
+    FlowManager() {
+        idx = 0;
+    }
+
+    void switchBuffer() {
+        idx = 1 - idx;
+    }
+
+    void addAllBytes(Packet& pkt, uint32_t len) {
         Flow flow(pkt);
-        if (flowAllMap.find(flow) != flowAllMap.end()) {
-            flowAllMap[flow] = flowAllMap[flow] + len;
+        if (flowAllMap[idx].find(flow) != flowAllMap[idx].end()) {
+            flowAllMap[idx][flow] = flowAllMap[idx][flow] + len;
         } else {
-            flowAllMap[flow] = len;
+            flowAllMap[idx][flow] = len;
         }
     }
 
-    void addLostBytes(Packet& pkt, uint32 len) {
+    void addLostBytes(Packet& pkt, uint32_t len) {
         Flow flow(pkt);
-        if (flowLostMap.find(flow) != flowLostMap.end()) {
-            flowLostMap[flow] = flowLostMap[flow] + len;
+        if (flowLostMap[idx].find(flow) != flowLostMap[idx].end()) {
+            flowLostMap[idx][flow] = flowLostMap[idx][flow] + len;
         } else {
-            flowLostMap[flow] = len;
+            flowLostMap[idx][flow] = len;
         }
     }
 
     uint64_t getAllVolume(Packet &pkt) {
         Flow flow(pkt);
-        uint64 allLen = 0;
-        if (flowAllMap.find(flow) != flowAllMap.end()) {
-            allLen = flowAllMap[flow];
+        uint64_t allLen = 0;
+        if (flowAllMap[idx].find(flow) != flowAllMap[idx].end()) {
+            allLen = flowAllMap[idx][flow];
         }
         return allLen;
     }
 
     double getLossRate(Packet& pkt) {
         Flow flow(pkt);
-        uint64 allLen = 0;
-        if (flowAllMap.find(flow) != flowAllMap.end()) {
-            allLen = flowAllMap[flow];
+        uint64_t allLen = 0;
+        if (flowAllMap[idx].find(flow) != flowAllMap[idx].end()) {
+            allLen = flowAllMap[idx][flow];
         }
         if (allLen == 0) {
             printf("zero\n");
             return 0;
         }
 
-        uint64 lostLen = 0;
-        if (flowLostMap.find(flow) != flowLostMap.end()) {
-            lostLen = flowLostMap[flow];
+        uint64_t lostLen = 0;
+        if (flowLostMap[idx].find(flow) != flowLostMap[idx].end()) {
+            lostLen = flowLostMap[idx][flow];
         }
         return 1.0 * lostLen / allLen;
     }
 };
+
 
 #endif

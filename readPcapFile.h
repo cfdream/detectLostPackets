@@ -15,7 +15,7 @@ union Num2bytes{
     unsigned short num;
 };
 
-union Num16bytes{
+union Num8bytes{
     char buffer[16];
     unsigned long long num;
 };
@@ -35,15 +35,11 @@ class ReadPcapFile{
         *pChar2 = temp;
     }
 
-    void swapOrder(Num16bytes &num) {
-        swapChars(&num.buffer[0], &num.buffer[15]);
-        swapChars(&num.buffer[1], &num.buffer[14]);
-        swapChars(&num.buffer[2], &num.buffer[13]);
-        swapChars(&num.buffer[3], &num.buffer[12]);
-        swapChars(&num.buffer[4], &num.buffer[11]);
-        swapChars(&num.buffer[5], &num.buffer[10]);
-        swapChars(&num.buffer[6], &num.buffer[9]);
-        swapChars(&num.buffer[7], &num.buffer[8]);
+    void swapOrder(Num8bytes &num) {
+        swapChars(&num.buffer[0], &num.buffer[7]);
+        swapChars(&num.buffer[1], &num.buffer[6]);
+        swapChars(&num.buffer[2], &num.buffer[5]);
+        swapChars(&num.buffer[3], &num.buffer[4]);
     }
 
     void swapOrder(Num4bytes &num) {
@@ -157,13 +153,18 @@ class ReadPcapFile{
             readData(fp, offset, (char*)(&seqid), sizeof(seqid), fileSize);
             swapOrder(seqid);
             
+            //timestamp: offset has not +=, this is to make sure "offset += (pcapLen- 42)" workes correctly
+            Num8bytes timestamp;
+            readData(fp, offset+4, (char*)(&timestamp), sizeof(timestamp), fileSize);
+            swapOrder(timestamp);
+
             //end of payload: end of packet 
             offset += (pcapLen- 42);
 
             //printf("%u,%u,%u,%u,%d - %d\n", srcip.num, dstip.num, srcport.num, dstport.num, len.num, seqid.num);
 
-            Packet packet(srcip.num, dstip.num, srcport.num, dstport.num, seqid.num, pcapLen);
-            groundTruthPacketQueue.push(packet);
+            Packet packet(srcip.num, dstip.num, srcport.num, dstport.num, seqid.num, pcapLen, timestamp.num);
+            g_groundTruthPacketQueue.push(packet);
         }
 
         fclose(fp);
@@ -221,7 +222,7 @@ class ReadPcapFile{
             //printf("read seqid:%d\n", seqid.num);
 
             //received packets
-            receivedPacketSet.insert(seqid.num);
+            g_receivedPacketSet.insert(seqid.num);
             setMaxSeqidReceived(seqid.num);
         }
 
