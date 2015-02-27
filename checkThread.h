@@ -70,6 +70,7 @@ void* checkAndSend(void* param) {
                 flow.AllVolume = g_flowManager.getAllVolume(pkt);
                 printf("lostPktNum:%d, seqid:%d srcip:%u - lost rate:%f, volume:%llu\n", ++lostPktNum, pkt.seqid, pkt.srcip, flow.lossRate, flow.AllVolume);
                 //TODO:send the infor to the network
+                //TODO:send data every several ms, this will make the overhead proportional
                 udpSender.sendMessage((char*)(&flow), sizeof(flow));
                 break;
             }
@@ -83,7 +84,7 @@ void* saveRestBufferToFile(void* temp) {
     char fname[100];
     char buffer[100];
     //g_ith_interval is the current interval, the rest buffer stores the previous interval data
-    snprintf(fname, 100, "data/%d.txt", g_ith_interval-1);
+    snprintf(fname, 100, "data/interval_%d.txt", g_ith_interval-1);
     FILE* fp = fopen(fname, "w");
     //write data in the rest buffer
     int restIdx = 1 - g_flowManager.idx;
@@ -100,6 +101,10 @@ void* saveRestBufferToFile(void* temp) {
         fputs(buffer, fp);
     }
     fclose(fp);
+
+    //clear the rest buffer
+    g_flowManager.flowAllMap[restIdx].clear();
+    g_flowManager.flowLostMap[restIdx].clear();
     return NULL;
 }
 
