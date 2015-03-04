@@ -13,10 +13,13 @@ const int MAX_CHECK_DELTA = 200;
 FlowManager g_flowManager;
 
 void* saveRestBufferToFile(void* temp);
+void* sendSignalToNetwork(void* temp);
 
 void* checkAndSend(void* param) {
-    int lostPktNum = 0;
-    pthread_t  thread_id;
+    //int lostPktNum = 0;
+    int allPktNum = 0;
+    pthread_t thread_id;
+    pthread_t signal_thread_id;
     while (true) {
         Packet pkt;
         //get one packet from the queue and delete it.
@@ -45,8 +48,10 @@ void* checkAndSend(void* param) {
 
                 //start a thread to store the rest buffer to file;
                 if(pthread_create(&thread_id, NULL,  saveRestBufferToFile, NULL) < 0) {
-                    ERROR("failed to create thread to controller_communicator");
+                    ERROR("failed to create thread to saveRestBufferToFile");
                 }
+                //clear the rest buffer
+                g_flowManager.clearRestBuffer();
             }
         }
         /*end check*/
@@ -59,12 +64,22 @@ void* checkAndSend(void* param) {
                 //packet received
                 //check next packet;
                 //printf("seqid:%d - received\n", pkt.seqid);
+
+                allPktNum++;
+                if (allPktNum % NUM_PKTS_TO_SEND_SIGNAL == 0) {
+                    if(pthread_create(&signal_thread_id, NULL, sendSignalToNetwork, NULL) < 0) {
+                        ERROR("failed to create thread to sendSignalToNetwork");
+                    }
+                    
+                }
+
                 break;
             }
             if ((int)getMaxSeqidReceived() - (int)pkt.seqid > MAX_CHECK_DELTA) {
                 //packet is lost
                 //record
                 g_flowManager.addLostBytes(pkt, pkt.len);
+                /*
                 Flow flow(pkt);
                 flow.lossRate = g_flowManager.getLossRate(pkt);
                 flow.AllVolume = g_flowManager.getAllVolume(pkt);
@@ -72,6 +87,7 @@ void* checkAndSend(void* param) {
                 //TODO:send the infor to the network
                 //TODO:send data every several ms, this will make the overhead proportional
                 udpSender.sendMessage((char*)(&flow), sizeof(flow));
+                */
                 break;
             }
             usleep(10);
@@ -83,21 +99,33 @@ void* checkAndSend(void* param) {
 void* saveRestBufferToFile(void* temp) {
     char fname[100];
     char buffer[100];
+    double lossRate;
+    map<Flow, uint64_t, classcomp>::iterator lossIter;
     //g_ith_interval is the current interval, the rest buffer stores the previous interval data
     snprintf(fname, 100, "data/interval_%d.txt", g_ith_interval-1);
     FILE* fp = fopen(fname, "w");
+    //write general information
+    snprintf(buffer, 100, "target flows, interval_seconds:%d, volume:%llu, lossRate:%f\n", 
+        INTERVAL_SECONDS, 
+        TARGET_VOLUME_THRESHOLD, 
+        TARGET_LOSS_RATE_THRESHOLD
+    );
+    fputs(buffer, fp);
     //write data in the rest buffer
     int restIdx = 1 - g_flowManager.idx;
     for (map<Flow, uint64_t, classcomp>::iterator iter = g_flowManager.flowAllMap[restIdx].begin();
         iter != g_flowManager.flowAllMap[restIdx].end();
         ++iter) {
-        snprintf(buffer, 100, "allVolume: %d\t%llu\n", iter->first.srcip, iter->second);
-        fputs(buffer, fp);
-    }
-    for (map<Flow, uint64_t, classcomp>::iterator iter = g_flowManager.flowLostMap[restIdx].begin();
-        iter != g_flowManager.flowLostMap[restIdx].end();
-        ++iter) {
-        snprintf(buffer, 100, "lostVolume: %d\t%llu\n", iter->first.srcip, iter->second);
+
+        lossIter = g_flowManager.flowLostMap[restIdx].find(iter->first);
+        if (lossIter != g_flowManager.flowLostMap[restIdx].end()) {
+            //loss volume exist
+            lossRate = 1.0 * lossIter->second / iter->second;
+        } else {
+            lossRate = 0;
+        }
+
+        snprintf(buffer, 100, "%d\t%llu\t%f\n", iter->first.srcip, iter->second, lossRate);
         fputs(buffer, fp);
     }
     fclose(fp);
@@ -105,6 +133,43 @@ void* saveRestBufferToFile(void* temp) {
     //clear the rest buffer
     g_flowManager.flowAllMap[restIdx].clear();
     g_flowManager.flowLostMap[restIdx].clear();
+    return NULL;
+}
+
+//send signal to switches
+void* sendSignalToNetwork(void* temp) {
+    int idx = g_flowManager.idx;
+    char buffer[100];
+    double lossRate = 0;
+    uint64_t totalVolume;
+    map<Flow, uint64_t, classcomp>::iterator lossIter;
+
+    for (map<Flow, uint64_t, classcomp>::iterator iter = g_flowManager.flowAllMap[idx].begin();
+        iter != g_flowManager.flowAllMap[idx].end();
+        ++iter) {
+        totalVolume = iter->second;
+        if (totalVolume < TARGET_VOLUME_THRESHOLD ) {
+            continue;
+        }
+
+        lossIter = g_flowManager.flowLostMap[idx].find(iter->first);
+        if (lossIter != g_flowManager.flowLostMap[idx].end()) {
+            //loss volume exist
+            lossRate = 1.0 * lossIter->second / totalVolume;
+            if (lossRate < TARGET_LOSS_RATE_THRESHOLD) {
+                continue;
+            }
+            //send the flow to the network
+            Flow flow(iter->first);
+            flow.lossRate = lossRate;
+            flow.AllVolume = totalVolume;
+            snprintf(buffer, 100, "target flow, srcip:%u - lost rate:%f, volume:%llu\n", iter->first.srcip, lossRate, totalVolume);
+            DEBUG(buffer);
+            //TODO:send the infor to the network
+            //TODO:send data every several ms, this will make the overhead proportional
+            udpSender.sendMessage((char*)(&flow), sizeof(flow));
+        }//if
+    }//for 
     return NULL;
 }
 

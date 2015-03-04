@@ -10,6 +10,19 @@
 
 using namespace std;
 
+//interval information
+//about time interval
+const uint64_t FIRST_INTERVAL_START_USECOND = 21600000000ULL;
+const uint64_t SECOND_2_USECOND = 1000000;
+const int INTERVAL_SECONDS = 5;
+const uint64_t USECONDS_IN_ONE_INTERVAL = 5000000;  //SECOND_2_USECOND * INTERVAL_SECONDS;
+//target flows
+const double TARGET_LOSS_RATE_THRESHOLD = 0.15;      //target flow loss rate threshold: 0.2
+const uint64_t TARGET_VOLUME_THRESHOLD = 20000;       //target flow volume threshold: 20k
+
+const int NUM_PKTS_TO_SEND_SIGNAL = 100000; //10w
+
+
 const uint32_t MAX_PACKETS_IN_BUFFER = 100000;
 
 class Packet{
@@ -40,43 +53,12 @@ public:
     uint32_t srcip;
     float lossRate;
     uint64_t AllVolume;
-    /*
-    uint32_t dstip;
-    uint16_t srcport;
-    uint16_t dstport;
-    */
-
-    /*
-    Flow(){}
-    Flow(uint32_t srcip, uint32_t dstip, uint16_t srcport, uint16_t dstport) {
-        this->srcip = srcip;
-        this->dstip = dstip;
-        this->srcport = srcport;
-        this->dstport = dstport;
-    }
-    */
     Flow(Packet &pkt) {
         this->srcip = pkt.srcip;
-        /*
-        this->dstip = pkt.dstip;
-        this->srcport = pkt.srcport;
-        this->dstport = pkt.dstport;
-        */
     }
-/*
-    bool operator<(const Flow &flow) const {
-        return !(this->srcip == flow.srcip &&
-                this->dstip == flow.dstip &&
-                this->srcport == flow.srcport &&
-                this->dstport == flow.dstport);
+    Flow(const Flow &flow) {
+        this->srcip = flow.srcip;
     }
-    bool operator()(const Flow &pkt1, const Flow &pkt2) const {
-        return !(pkt2.srcip == pkt1.srcip &&
-                pkt2.dstip == pkt1.dstip &&
-                pkt2.srcport == pkt1.srcport &&
-                pkt2.dstport == pkt1.dstport);
-    }
-*/
 };
 
 //thread safe set
@@ -166,13 +148,6 @@ pthread_mutex_t g_seqidMtx = PTHREAD_MUTEX_INITIALIZER;;
 
 uint32_t g_ith_interval = 0;
 bool g_first_pkt = true;
-
-//interval information
-//about time interval
-const uint64_t FIRST_INTERVAL_START_USECOND = 21600000000ULL;
-const uint64_t SECOND_2_USECOND = 1000000;
-const int INTERVAL_SECONDS = 30;
-const uint64_t USECONDS_IN_ONE_INTERVAL = 30000000;  //SECOND_2_USECOND * INTERVAL_SECONDS;
 
 /*End GlobalData Definition*/
 /*End GlobalData Definition*/

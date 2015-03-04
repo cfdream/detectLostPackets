@@ -95,6 +95,11 @@ public:
         }
         return 1.0 * lostLen / allLen;
     }
+
+    void clearRestBuffer() {
+        flowAllMap[1-idx].clear();
+        flowLostMap[1-idx].clear();
+    }
 };
 
 
